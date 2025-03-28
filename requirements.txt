@@ -1,3 +1,4 @@
 flask
 pandas
-jobspy
+git+https://github.com/cullenwatson/JobSpy.git
+

@@ -1,22 +1,47 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from jobspy import scrape_jobs
-import os
+import threading
+import webbrowser
+import time
 
 app = Flask(__name__)
 
-@app.route("/")
+@app.route("/", methods=["GET", "POST"])
 def index():
-    jobs = scrape_jobs(
-        site_name=["indeed", "linkedin", "zip_recruiter", "glassdoor", "google", "bayt", "naukri"],
-        search_term="software engineer",
-        google_search_term="software engineer jobs near San Francisco, CA since yesterday",
-        location="San Francisco, CA",
-        results_wanted=20,
-        hours_old=72,
-        country_indeed='USA',
-    )
-    job_list = jobs.to_dict(orient='records')
-    return render_template("index.html", jobs=job_list)
+    jobs = []
+    if request.method == "POST":
+        search_term = request.form.get("search_term")
+        location = request.form.get("location")
+        hours_old = int(request.form.get("hours_old", 72))
+        results_wanted = int(request.form.get("results_wanted", 20))
+        site_name = request.form.getlist("site_name")
+
+        google_search_term = None
+        if "google" in site_name:
+            google_search_term = f"{search_term} jobs near {location} since yesterday"
+
+        try:
+            jobs_df = scrape_jobs(
+                site_name=site_name,
+                search_term=search_term,
+                google_search_term=google_search_term,
+                location=location,
+                results_wanted=results_wanted,
+                hours_old=hours_old,
+                country_indeed='USA',
+            )
+            jobs = jobs_df.to_dict(orient="records")
+        except Exception as e:
+            print("Scraping error:", e)
+
+    return render_template("index.html", jobs=jobs)
+
+def run_server():
+    app.run(host="127.0.0.1", port=8080, debug=False)
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
+    threading.Thread(target=run_server, daemon=True).start()
+    time.sleep(1.5)  # Allow server to spin up
+    webbrowser.open("http://127.0.0.1:8080")
+    while True:
+        pass  # Keep the app alive (or replace with app loop logic)
